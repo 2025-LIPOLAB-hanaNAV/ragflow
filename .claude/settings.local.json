@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)",
+      "Bash(docker save:*)",
+      "Bash(tar:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker inspect:*)",
+      "Bash(sudo ls:*)",
+      "Bash(docker volume:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
