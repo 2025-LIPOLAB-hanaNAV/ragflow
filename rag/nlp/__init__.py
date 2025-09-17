@@ -28,6 +28,7 @@ from cn2an import cn2an
 from PIL import Image
 
 import chardet
+from deepdoc.korean_corrector import correct_korean_text
 
 all_codecs = [
     'utf-8', 'gb2312', 'gbk', 'utf_16', 'ascii', 'big5', 'big5hkscs',
@@ -258,10 +259,12 @@ def is_chinese(text):
 
 
 def tokenize(d, t, eng):
-    d["content_with_weight"] = t
-    t = re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", t)
-    d["content_ltks"] = rag_tokenizer.tokenize(t)
+    corrected = correct_korean_text(t)
+    d["content_with_weight"] = corrected
+    sanitized = re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", corrected)
+    d["content_ltks"] = rag_tokenizer.tokenize(sanitized)
     d["content_sm_ltks"] = rag_tokenizer.fine_grained_tokenize(d["content_ltks"])
+    return corrected
 
 
 def tokenize_chunks(chunks, doc, eng, pdf_parser=None):
@@ -308,7 +311,6 @@ def tokenize_table(tbls, doc, eng, batch_size=10):
         if isinstance(rows, str):
             d = copy.deepcopy(doc)
             tokenize(d, rows, eng)
-            d["content_with_weight"] = rows
             if img:
                 d["image"] = img
                 d["doc_type_kwd"] = "image"

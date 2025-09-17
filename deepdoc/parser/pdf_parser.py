@@ -34,6 +34,7 @@ from pypdf import PdfReader as pdf2_read
 
 from api import settings
 from api.utils.file_utils import get_project_base_directory
+from deepdoc.korean_corrector import correct_korean_text
 from deepdoc.vision import OCR, AscendLayoutRecognizer, LayoutRecognizer, Recognizer, TableStructureRecognizer
 from rag.app.picture import vision_llm_chunk as picture_vision_llm_chunk
 from rag.nlp import rag_tokenizer
@@ -43,6 +44,14 @@ from rag.settings import PARALLEL_DEVICES
 LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
 if LOCK_KEY_pdfplumber not in sys.modules:
     sys.modules[LOCK_KEY_pdfplumber] = threading.Lock()
+
+
+def is_korean_char(char):
+    """Check if a character is Korean"""
+    if not char:
+        return False
+    code = ord(char)
+    return (0xAC00 <= code <= 0xD7AF) or (0x1100 <= code <= 0x11FF) or (0x3130 <= code <= 0x318F)
 
 
 class RAGFlowPdfParser:
@@ -315,7 +324,7 @@ class RAGFlowPdfParser:
             m_ht = np.mean([c["height"] for c in b["chars"]])
             for c in Recognizer.sort_Y_firstly(b["chars"], m_ht):
                 if c["text"] == " " and b["text"]:
-                    if re.match(r"[0-9a-zA-Zа-яА-Я,.?;:!%%]", b["text"][-1]):
+                    if re.match(r"[0-9a-zA-Zа-яА-Я,.?;:!%%]", b["text"][-1]) or is_korean_char(b["text"][-1]):
                         b["text"] += " "
                 else:
                     b["text"] += c["text"]
@@ -400,6 +409,9 @@ class RAGFlowPdfParser:
                 continue
             i += 1
         self.boxes = bxs
+
+        # Apply Korean text correction if enabled
+        self._apply_korean_correction()
 
     def _naive_vertical_merge(self, zoomin=3):
         bxs = Recognizer.sort_Y_firstly(self.boxes, np.median(self.mean_height) / 3)
@@ -1190,6 +1202,20 @@ class RAGFlowPdfParser:
             pn += 1
             poss.append((pn, bx["x0"], bx["x1"], top, min(bott, self.page_images[pn - 1].size[1] / ZM)))
         return poss
+
+    def _apply_korean_correction(self):
+        """Apply Korean text correction to extracted text"""
+        try:
+            for box in self.boxes:
+                if box.get("text") and box.get("layout_type") == "text":
+                    original_text = box["text"]
+                    corrected_text = correct_korean_text(original_text)
+                    if corrected_text != original_text:
+                        logging.debug(f"Korean correction applied: '{original_text}' -> '{corrected_text}'")
+                        box["text"] = corrected_text
+        except Exception as e:
+            logging.error(f"Korean text correction failed: {str(e)}")
+            # Continue without correction if there's an error
 
 
 class PlainParser:

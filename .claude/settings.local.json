@@ -8,7 +8,20 @@
       "Bash(docker exec:*)",
       "Bash(docker inspect:*)",
       "Bash(sudo ls:*)",
-      "Bash(docker volume:*)"
+      "Bash(docker volume:*)",
+      "Bash(docker restart:*)",
+      "Bash(python3:*)",
+      "Bash(docker run:*)",
+      "Bash(docker cp:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(cp:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(python test:*)",
+      "Bash(python:*)",
+      "Bash(docker-compose:*)"
     ],
     "deny": [],
     "ask": []
