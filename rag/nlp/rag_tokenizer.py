@@ -320,7 +320,27 @@ class RagTokenizer:
         return txt_lang_pairs
 
     def tokenize(self, line):
-        line = re.sub(r"\W+", " ", line)
+        # Preserve Korean characters while cleaning other non-word characters
+        # Korean Unicode ranges: 0xAC00-0xD7AF (Hangul Syllables), 0x1100-0x11FF (Hangul Jamo), 0x3130-0x318F (Hangul Compatibility Jamo)
+        def has_korean(text):
+            if not text:
+                return False
+            for char in text:
+                code = ord(char)
+                if (0xAC00 <= code <= 0xD7AF) or (0x1100 <= code <= 0x11FF) or (0x3130 <= code <= 0x318F):
+                    return True
+            return False
+
+        # If text contains Korean, use different cleaning strategy
+        if has_korean(line):
+            # For Korean text, only remove special characters but preserve spaces and Korean characters
+            line = re.sub(r"[^\w\s가-힣]", " ", line)
+            # Normalize multiple spaces to single space
+            line = re.sub(r"\s+", " ", line).strip()
+        else:
+            # Original logic for non-Korean text
+            line = re.sub(r"\W+", " ", line)
+
         line = self._strQ2B(line).lower()
         line = self._tradi2simp(line)
 

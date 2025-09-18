@@ -35,6 +35,26 @@ def singleton(cls, *args, **kw):
 
 
 def rmSpace(txt):
+    # Check if text contains Korean characters
+    def has_korean(text):
+        if not text:
+            return False
+        korean_chars = 0
+        total_chars = 0
+        for char in text:
+            if char.strip():
+                total_chars += 1
+                code = ord(char)
+                if (0xAC00 <= code <= 0xD7AF) or (0x1100 <= code <= 0x11FF) or (0x3130 <= code <= 0x318F):
+                    korean_chars += 1
+        return total_chars > 0 and (korean_chars / total_chars) > 0.1
+
+    # If text contains Korean, preserve spacing
+    if has_korean(txt):
+        # Only remove excessive spaces (more than one space)
+        return re.sub(r' {2,}', ' ', txt)
+
+    # Original logic for non-Korean text
     txt = re.sub(r"([^a-z0-9.,\)>]) +([^ ])", r"\1\2", txt, flags=re.IGNORECASE)
     return re.sub(r"([^ ]) +([^a-z0-9.,\(<])", r"\1\2", txt, flags=re.IGNORECASE)
 

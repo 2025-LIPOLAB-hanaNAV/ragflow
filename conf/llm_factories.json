@@ -767,7 +767,7 @@
         {
             "name": "Ollama",
             "logo": "",
-            "tags": "LLM,TEXT EMBEDDING,SPEECH2TEXT,MODERATION",
+            "tags": "LLM,TEXT EMBEDDING,RERANK,SPEECH2TEXT,MODERATION",
             "status": "1",
             "llm": []
         },

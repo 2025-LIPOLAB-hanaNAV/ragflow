@@ -627,6 +627,161 @@ class GiteeRerank(JinaRerank):
         super().__init__(key, model_name, base_url)
 
 
+class OllamaRerank(Base):
+    _FACTORY_NAME = "Ollama"
+
+    def __init__(self, key, model_name, base_url="http://localhost:11434", **kwargs):
+        from ollama import Client
+
+        self.client = Client(host=base_url) if not key or key == "x" else Client(host=base_url, headers={"Authorization": f"Bearer {key}"})
+        self.model_name = model_name
+        self.keep_alive = kwargs.get("ollama_keep_alive", int(os.environ.get("OLLAMA_KEEP_ALIVE", -1)))
+
+    def similarity(self, query: str, texts: list):
+        if len(texts) == 0:
+            return np.array([]), 0
+
+        token_count = 0
+        similarities = []
+
+        try:
+            # First, try to use the model as a proper reranker via generate API
+            # This is for models like bge-reranker-v2-m3 that are actual rerankers
+            if self._is_reranker_model():
+                similarities, token_count = self._compute_reranker_scores(query, texts)
+            else:
+                # Fallback to embedding-based similarity for regular embedding models
+                similarities, token_count = self._compute_embedding_similarity(query, texts)
+
+        except Exception as _e:
+            log_exception(_e)
+            # Try fallback method if the first approach fails
+            try:
+                similarities, token_count = self._compute_embedding_similarity(query, texts)
+            except Exception as fallback_e:
+                log_exception(fallback_e)
+                # Return zeros if both methods fail
+                similarities = [0.0] * len(texts)
+                token_count = 0
+
+        return np.array(similarities), token_count
+
+    def _is_reranker_model(self):
+        """Check if the model is a dedicated reranker model based on model name"""
+        reranker_keywords = [
+            'rerank', 'bge-reranker', 'cross-encoder', 'reranker-v2',
+            'ms-marco', 'rank-', 'ranking'
+        ]
+        model_name_lower = self.model_name.lower()
+        return any(keyword in model_name_lower for keyword in reranker_keywords)
+
+    def _compute_reranker_scores(self, query: str, texts: list):
+        """Compute scores using the model as a proper reranker"""
+        similarities = []
+        token_count = 0
+
+        for text in texts:
+            try:
+                # For BGE reranker models, use the format they expect
+                if 'bge-reranker' in self.model_name.lower():
+                    # BGE rerankers often use a classification approach
+                    # Try to use it as a classifier first
+                    truncated_text = truncate(text, 1900)
+                    prompt = f"Given the query '{query}' and the document '{truncated_text}', is the document relevant to the query? Answer with 'Yes' or 'No' followed by a confidence score from 0.0 to 1.0."
+                elif 'cross-encoder' in self.model_name.lower():
+                    # Cross-encoder models often expect a specific format
+                    truncated_text = truncate(text, 1900)
+                    prompt = f"Query: {query}\nPassage: {truncated_text}\nRelevant:"
+                else:
+                    # Generic reranker prompt
+                    prompt = f"Rate the relevance of this document to the query on a scale of 0 to 1.\n\nQuery: {query}\n\nDocument: {truncate(text, 1900)}\n\nRelevance score:"
+
+                response = self.client.generate(
+                    model=self.model_name,
+                    prompt=prompt,
+                    options={
+                        "temperature": 0.0,
+                        "top_p": 1.0,
+                        "top_k": 1,
+                        "use_mmap": True,
+                        "num_predict": 10  # We only need a short response for the score
+                    },
+                    keep_alive=self.keep_alive
+                )
+
+                # Extract score from response
+                score_text = response['response'].strip()
+
+                # Try to extract a number from the response
+                import re
+
+                # Look for decimal numbers or integers that could be scores
+                numbers = re.findall(r'(?:0?\.\d+|1\.0?|[01])', score_text)
+
+                if numbers:
+                    score = float(numbers[0])
+                    # Ensure score is in valid range
+                    score = max(0.0, min(1.0, score))
+                else:
+                    # If no clear number, try to interpret the response
+                    score_text_lower = score_text.lower()
+                    if any(word in score_text_lower for word in ['yes', 'relevant', 'true', 'positive']):
+                        score = 0.8  # High relevance
+                    elif any(word in score_text_lower for word in ['no', 'irrelevant', 'false', 'negative']):
+                        score = 0.2  # Low relevance
+                    else:
+                        score = 0.5  # Uncertain
+
+                similarities.append(score)
+                token_count += num_tokens_from_string(prompt) + num_tokens_from_string(score_text)
+
+            except Exception as e:
+                log_exception(e)
+                similarities.append(0.0)
+                token_count += num_tokens_from_string(prompt) if 'prompt' in locals() else 50
+
+        return similarities, token_count
+
+    def _compute_embedding_similarity(self, query: str, texts: list):
+        """Fallback method using embedding similarity"""
+        token_count = 0
+        similarities = []
+
+        # Get query embedding
+        query_res = self.client.embeddings(
+            prompt=query,
+            model=self.model_name,
+            options={"use_mmap": True},
+            keep_alive=self.keep_alive
+        )
+        query_embedding = np.array(query_res["embedding"])
+        token_count += 128  # Estimated token count for query
+
+        # Get embeddings for all texts
+        text_embeddings = []
+        for text in texts:
+            text_res = self.client.embeddings(
+                prompt=truncate(text, 2048),
+                model=self.model_name,
+                options={"use_mmap": True},
+                keep_alive=self.keep_alive
+            )
+            text_embeddings.append(np.array(text_res["embedding"]))
+            token_count += 128  # Estimated token count per text
+
+        # Calculate cosine similarities
+        for text_embedding in text_embeddings:
+            # Normalize vectors
+            query_norm = query_embedding / np.linalg.norm(query_embedding)
+            text_norm = text_embedding / np.linalg.norm(text_embedding)
+
+            # Calculate cosine similarity
+            similarity = np.dot(query_norm, text_norm)
+            similarities.append(similarity)
+
+        return similarities, token_count
+
+
 class Ai302Rerank(Base):
     _FACTORY_NAME = "302.AI"
 

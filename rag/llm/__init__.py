@@ -112,6 +112,12 @@ for module_name, mapping_dict in MODULE_MAPPING.items():
                 else:
                     mapping_dict[obj._FACTORY_NAME] = obj
 
+# Ensure OllamaRerank is registered
+try:
+    from rag.llm.rerank_model import OllamaRerank
+    RerankModel["Ollama"] = OllamaRerank
+except ImportError:
+    pass
 
 __all__ = [
     "ChatModel",
