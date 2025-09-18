@@ -4023,9 +4023,9 @@
                 },
                 {
                     "llm_name": "bge-reranker-v2-m3",
-                    "tags": "TEXT EMBEDDING,TEXT RE-RANK",
+                    "tags": "TEXT RE-RANK",
                     "max_tokens": 8192,
-                    "model_type": "embedding",
+                    "model_type": "rerank",
                     "is_tools": false
                 },
                 {

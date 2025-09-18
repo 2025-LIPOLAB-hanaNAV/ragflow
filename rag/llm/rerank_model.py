@@ -87,12 +87,9 @@ class DefaultRerank(Base):
                         try:
                             props = torch.cuda.get_device_properties(0)
                             compute_cap = int(f"{props.major}{props.minor}")
-                            # RTX 5080 (sm_120) not supported in PyTorch 2.7.1, fallback to CPU
-                            if compute_cap >= 120:
-                                print(f"⚠️ GPU {props.name} (sm_{props.major}{props.minor}) not supported, using CPU")
-                                use_gpu = False
-                            else:
-                                use_gpu = True
+                            # Enable GPU for all compatible architectures including Blackwell (sm_120+)
+                            use_gpu = True
+                            print(f"✅ Using GPU {props.name} (sm_{props.major}{props.minor})")
                         except Exception:
                             use_gpu = torch.cuda.is_available()
 
@@ -122,7 +119,7 @@ class DefaultRerank(Base):
         old_dynamic_batch_size = self._dynamic_batch_size
         if max_batch_size is not None:
             self._dynamic_batch_size = max_batch_size
-        res = np.array(len(pairs), dtype=float)
+        res = np.zeros(len(pairs), dtype=float)
         i = 0
         while i < len(pairs):
             cur_i = i
@@ -159,6 +156,9 @@ class DefaultRerank(Base):
             scores = self._model.compute_score(batch_pairs, max_length=max_length, normalize=True)
         if not isinstance(scores, Iterable):
             scores = [scores]
+        # Ensure scores is always a list/array, even for single batch
+        if hasattr(scores, 'ndim') and scores.ndim == 0:
+            scores = [float(scores)]
         return scores
 
     def similarity(self, query: str, texts: list):
@@ -210,11 +210,9 @@ class YoudaoRerank(DefaultRerank):
                         try:
                             props = torch.cuda.get_device_properties(0)
                             compute_cap = int(f"{props.major}{props.minor}")
-                            if compute_cap >= 120:
-                                print(f"⚠️ GPU {props.name} (sm_{props.major}{props.minor}) not supported for YoudaoRerank, using CPU")
-                                device = 'cpu'
-                            else:
-                                device = 'cuda'
+                            # Enable GPU for all compatible architectures including Blackwell (sm_120+)
+                            device = 'cuda'
+                            print(f"✅ YoudaoRerank using GPU {props.name} (sm_{props.major}{props.minor})")
                         except Exception:
                             device = 'cuda' if torch.cuda.is_available() else 'cpu'
 

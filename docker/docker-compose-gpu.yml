@@ -20,6 +20,8 @@ services:
       - ./nginx/proxy.conf:/etc/nginx/proxy.conf
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ../deepdoc:/ragflow/deepdoc
+      - ../rag/llm/rerank_model.py:/ragflow/rag/llm/rerank_model.py
+      - ../conf/llm_factories.json:/ragflow/conf/llm_factories.json
     env_file: .env
     environment:
       - TZ=${TIMEZONE}
