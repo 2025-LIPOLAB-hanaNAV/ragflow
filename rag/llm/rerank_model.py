@@ -81,11 +81,30 @@ class DefaultRerank(Base):
 
             with DefaultRerank._model_lock:
                 if not DefaultRerank._model:
+                    # GPU compatibility check for RTX 5080+ (sm_120+)
+                    use_gpu = False
+                    if torch.cuda.is_available():
+                        try:
+                            props = torch.cuda.get_device_properties(0)
+                            compute_cap = int(f"{props.major}{props.minor}")
+                            # RTX 5080 (sm_120) not supported in PyTorch 2.7.1, fallback to CPU
+                            if compute_cap >= 120:
+                                print(f"⚠️ GPU {props.name} (sm_{props.major}{props.minor}) not supported, using CPU")
+                                use_gpu = False
+                            else:
+                                use_gpu = True
+                        except Exception:
+                            use_gpu = torch.cuda.is_available()
+
+                    # Backup option: Uncomment for PyTorch 2.7.1+ upgrade
+                    use_gpu = torch.cuda.is_available()  # Force GPU after PyTorch 2.7.1+ upgrade
+
+                    device = 'cuda' if use_gpu else 'cpu'
                     try:
-                        DefaultRerank._model = FlagReranker(os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)), use_fp16=torch.cuda.is_available())
+                        DefaultRerank._model = FlagReranker(os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)), use_fp16=use_gpu, device=device)
                     except Exception:
                         model_dir = snapshot_download(repo_id=model_name, local_dir=os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)), local_dir_use_symlinks=False)
-                        DefaultRerank._model = FlagReranker(model_dir, use_fp16=torch.cuda.is_available())
+                        DefaultRerank._model = FlagReranker(model_dir, use_fp16=use_gpu, device=device)
         self._model = DefaultRerank._model
         self._dynamic_batch_size = 8
         self._min_batch_size = 1
@@ -180,14 +199,32 @@ class YoudaoRerank(DefaultRerank):
 
     def __init__(self, key=None, model_name="maidalun1020/bce-reranker-base_v1", **kwargs):
         if not settings.LIGHTEN and not YoudaoRerank._model:
+            import torch
             from BCEmbedding import RerankerModel
 
             with YoudaoRerank._model_lock:
                 if not YoudaoRerank._model:
+                    # GPU compatibility check for RTX 5080+ (sm_120+)
+                    device = 'cpu'  # Default to CPU
+                    if torch.cuda.is_available():
+                        try:
+                            props = torch.cuda.get_device_properties(0)
+                            compute_cap = int(f"{props.major}{props.minor}")
+                            if compute_cap >= 120:
+                                print(f"⚠️ GPU {props.name} (sm_{props.major}{props.minor}) not supported for YoudaoRerank, using CPU")
+                                device = 'cpu'
+                            else:
+                                device = 'cuda'
+                        except Exception:
+                            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+                    # Backup option: Uncomment for PyTorch 2.7.1+ upgrade
+                    device = 'cuda' if torch.cuda.is_available() else 'cpu'  # Force GPU after PyTorch 2.7.1+ upgrade
+
                     try:
-                        YoudaoRerank._model = RerankerModel(model_name_or_path=os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)))
+                        YoudaoRerank._model = RerankerModel(model_name_or_path=os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)), device=device)
                     except Exception:
-                        YoudaoRerank._model = RerankerModel(model_name_or_path=model_name.replace("maidalun1020", "InfiniFlow"))
+                        YoudaoRerank._model = RerankerModel(model_name_or_path=model_name.replace("maidalun1020", "InfiniFlow"), device=device)
 
         self._model = YoudaoRerank._model
         self._dynamic_batch_size = 8

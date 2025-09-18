@@ -188,6 +188,16 @@ ENV VIRTUAL_ENV=/ragflow/.venv
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
+# Install PyTorch 2.7.1+cu128 for RTX 5080 Blackwell support
+RUN --mount=type=cache,id=ragflow_pip,target=/root/.cache/pip,sharing=locked \
+    python -m ensurepip --upgrade && \
+    python -m pip install --upgrade pip && \
+    python -m pip install \
+        --extra-index-url https://download.pytorch.org/whl/cu128 \
+        torch==2.7.1+cu128 \
+        torchvision==0.22.1+cu128 \
+        torchaudio==2.7.1+cu128
+
 ENV PYTHONPATH=/ragflow/
 
 COPY web web

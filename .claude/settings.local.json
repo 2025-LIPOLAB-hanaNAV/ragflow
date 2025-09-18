@@ -21,7 +21,17 @@
       "Bash(docker-compose down:*)",
       "Bash(python test:*)",
       "Bash(python:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Read(//mnt/wsl/docker-desktop-bind-mounts/Ubuntu/**)",
+      "Read(//mnt/**)",
+      "Bash(git restore:*)",
+      "Bash(npm start)",
+      "Bash(npm run:*)",
+      "Bash(npm install)",
+      "Bash(nvidia-smi:*)",
+      "Bash(uv lock:*)",
+      "Bash(chmod:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
