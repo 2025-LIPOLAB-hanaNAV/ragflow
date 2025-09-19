@@ -31,7 +31,13 @@
       "Bash(nvidia-smi:*)",
       "Bash(uv lock:*)",
       "Bash(chmod:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(docker system df)",
+      "Bash(netstat:*)",
+      "Bash(git commit:*)",
+      "Bash(docker ps:*)",
+      "Bash(git clone:*)"
     ],
     "deny": [],
     "ask": []

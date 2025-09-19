@@ -22,11 +22,17 @@ services:
       - ../deepdoc:/ragflow/deepdoc
       - ../rag/llm/rerank_model.py:/ragflow/rag/llm/rerank_model.py
       - ../conf/llm_factories.json:/ragflow/conf/llm_factories.json
+      - ./models:/ragflow/models
+      - ./models:/root/.cache/huggingface
+      - ./models:/root/.cache/modelscope
     env_file: .env
     environment:
       - TZ=${TIMEZONE}
       - HF_ENDPOINT=${HF_ENDPOINT}
       - MACOS=${MACOS}
+      - HF_HOME=/root/.cache/huggingface
+      - TRANSFORMERS_CACHE=/root/.cache/huggingface
+      - MODEL_PATH=/ragflow/models
     networks:
       - ragflow
     restart: on-failure

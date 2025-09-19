@@ -26,7 +26,7 @@ fi
 
 # Build the Docker image
 echo "🏗️ Building Docker image..."
-docker build --build-arg LIGHTEN=0 --build-arg NEED_MIRROR=0 -t ragflow:blackwell-rtx5080 .
+docker build --build-arg LIGHTEN=0 --build-arg NEED_MIRROR=0 -t jjkim110523/ragflow:blackwell .
 
 # Check build result
 if [ $? -eq 0 ]; then
