@@ -18,7 +18,8 @@ import json
 import logging
 import re
 import requests
-from typing import Optional, List
+from difflib import SequenceMatcher
+from typing import List
 
 
 class KoreanTextCorrector:
@@ -28,12 +29,17 @@ class KoreanTextCorrector:
         self.ollama_url = ollama_url
         self.model = model
         self.correction_prompt = """다음 한국어 텍스트의 맞춤법과 띄어쓰기를 자연스럽게 교정해주세요.
-OCR로 인식된 텍스트이므로 문맥을 고려하여 올바른 형태로 수정해주세요.
-원본 의미를 최대한 보존하면서 자연스러운 한국어로 만들어주세요.
+OCR로 인식된 텍스트이므로 문맥을 고려하되, 아래 제약을 반드시 지켜주세요.
+- 요약하거나 문장을 삭제·추가·재배열하지 않습니다.
+- 줄바꿈, 문장 수, 문단 수를 가능한 한 그대로 유지합니다.
+- 원본에 없는 설명이나 주석을 덧붙이지 않습니다.
+- 답변에는 교정된 문장만 포함하고 다른 말은 하지 않습니다.
 
-원본 텍스트: {text}
+<원본>
+{text}
+</원본>
 
-교정된 텍스트:"""
+<교정본>"""
 
     def is_korean_text(self, text: str) -> bool:
         """Check if text contains Korean characters"""
@@ -56,31 +62,73 @@ OCR로 인식된 텍스트이므로 문맥을 고려하여 올바른 형태로 �
         # If more than 10% of characters are Korean, consider it Korean text
         return (korean_chars / total_chars) > 0.1
 
-    def clean_response(self, response_text: str) -> str:
-        """Clean and extract the corrected text from LLM response"""
-        # Remove any markdown formatting
-        response_text = re.sub(r'```[^`]*```', '', response_text)
-        response_text = re.sub(r'`[^`]*`', '', response_text)
+    def _strip_fences(self, text: str) -> str:
+        """Remove common fence markers without altering order."""
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        text = re.sub(r"```", "", text)
+        text = re.sub(r"`([^`]*)`", r"\1", text)
+        return text
 
-        # Split by lines and find the most relevant line
-        lines = [line.strip() for line in response_text.split('\n') if line.strip()]
+    def clean_response(self, response_text: str, original_text: str) -> str:
+        """Clean LLM output while keeping structure and fall back if invalid."""
+        cleaned = self._strip_fences(response_text or "").strip()
 
-        if not lines:
-            return response_text.strip()
+        cleaned = re.sub(r"^\s*<교정본>\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"</교정본>\s*$", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"^\s*(교정된\s*텍스트\s*[:：])\s*", "", cleaned, flags=re.IGNORECASE)
 
-        # Look for lines that don't contain common prompt markers
-        filtered_lines = []
-        for line in lines:
-            if not any(marker in line.lower() for marker in [
-                '교정된', '원본', '텍스트:', '다음', '맞춤법', '띄어쓰기', 'ocr'
-            ]):
-                filtered_lines.append(line)
+        if not cleaned:
+            return original_text
 
-        # Return the longest meaningful line
-        if filtered_lines:
-            return max(filtered_lines, key=len)
-        else:
-            return lines[-1] if lines else response_text.strip()
+        if not self._is_valid_correction(original_text, cleaned):
+            logging.warning(
+                "Korean correction rejected due to large deviation. original_len=%s corrected_len=%s",
+                len(original_text.strip()),
+                len(cleaned.strip()),
+            )
+            return original_text
+
+        return cleaned
+
+    @staticmethod
+    def _is_valid_correction(original: str, corrected: str) -> bool:
+        """Ensure corrected text stays close to the original content."""
+        if not original.strip():
+            return True
+
+        orig_text = original.strip()
+        corr_text = corrected.strip()
+        orig_len = len(orig_text)
+        corr_len = len(corr_text)
+
+        if corr_len == 0:
+            return False
+
+        if orig_len <= 10:
+            # Very short snippets are accepted as long as they are non-empty
+            return True
+
+        ratio = corr_len / orig_len if orig_len else 1.0
+        if ratio < 0.6 or ratio > 1.4:
+            return False
+
+        orig_lines = [l for l in orig_text.splitlines() if l.strip()]
+        corr_lines = [l for l in corr_text.splitlines() if l.strip()]
+        if orig_lines:
+            line_ratio = len(corr_lines) / len(orig_lines) if len(orig_lines) else 1.0
+            if line_ratio < 0.5 or line_ratio > 1.7:
+                return False
+
+        orig_compact = re.sub(r"\s+", "", orig_text)
+        corr_compact = re.sub(r"\s+", "", corr_text)
+        if not corr_compact:
+            return False
+
+        similarity = SequenceMatcher(None, orig_compact, corr_compact).ratio()
+        if similarity < 0.65:
+            return False
+
+        return True
 
     def correct_text(self, text: str) -> str:
         """Correct Korean text using Ollama"""
@@ -116,13 +164,8 @@ OCR로 인식된 텍스트이므로 문맥을 고려하여 올바른 형태로 �
                 corrected_text = result.get('response', '').strip()
 
                 if corrected_text:
-                    cleaned_text = self.clean_response(corrected_text)
-                    # Basic validation: corrected text shouldn't be dramatically different in length
-                    if len(cleaned_text) > 0 and len(cleaned_text) < len(text) * 3:
-                        return cleaned_text
-                    else:
-                        logging.warning(f"Korean correction produced unexpected result length. Original: {len(text)}, Corrected: {len(cleaned_text)}")
-                        return text
+                    cleaned_text = self.clean_response(corrected_text, text)
+                    return cleaned_text
                 else:
                     logging.warning("Empty response from Korean corrector")
                     return text
@@ -145,12 +188,14 @@ OCR로 인식된 텍스트이므로 문맥을 고려하여 올바른 형태로 �
 # Global instance
 _korean_corrector = None
 
+
 def get_korean_corrector() -> KoreanTextCorrector:
     """Get or create Korean corrector instance"""
     global _korean_corrector
     if _korean_corrector is None:
         _korean_corrector = KoreanTextCorrector()
     return _korean_corrector
+
 
 def correct_korean_text(text: str) -> str:
     """Convenience function to correct Korean text"""
