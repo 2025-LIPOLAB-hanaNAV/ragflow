@@ -26,7 +26,7 @@ fi
 
 # Build the Docker image
 echo "🏗️ Building Docker image..."
-docker build --build-arg LIGHTEN=0 --build-arg NEED_MIRROR=0 -t jjkim110523/ragflow:blackwell .
+docker build --build-arg LIGHTEN=0 --build-arg NEED_MIRROR=0 -t jjkim110523/ragflow:latest .
 
 # Check build result
 if [ $? -eq 0 ]; then
@@ -36,7 +36,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "📋 Next steps:"
     echo "   1. Stop existing RAGFlow containers: docker-compose down"
-    echo "   2. Update docker-compose.yml to use the new image: ragflow:blackwell-rtx5080"
+    echo "   2. Update docker-compose.yml to use the new image: ragflow:latest"
     echo "   3. Start RAGFlow: docker-compose up -d"
     echo "   4. Test BAAI/bge-reranker-v2-m3 model functionality"
     echo ""
