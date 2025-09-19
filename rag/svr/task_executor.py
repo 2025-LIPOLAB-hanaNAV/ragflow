@@ -65,6 +65,7 @@ from rag.settings import DOC_MAXIMUM_SIZE, DOC_BULK_SIZE, EMBEDDING_BATCH_SIZE, 
 from rag.utils import num_tokens_from_string, truncate
 from rag.utils.redis_conn import REDIS_CONN, RedisDistributedLock
 from rag.utils.storage_factory import STORAGE_IMPL
+from rag.utils.ollama_control import pause_ollama_models
 from graphrag.utils import chat_limiter
 
 BATCH_SIZE = 64
@@ -268,7 +269,9 @@ async def build_chunks(task, progress_callback):
 
     try:
         async with chunk_limiter:
-            cks = await trio.to_thread.run_sync(lambda: chunker.chunk(task["name"], binary=binary, from_page=task["from_page"],
+            models_to_pause = task.get("parser_config", {}).get("ollama_pause_models")
+            with pause_ollama_models(models_to_pause):
+                cks = await trio.to_thread.run_sync(lambda: chunker.chunk(task["name"], binary=binary, from_page=task["from_page"],
                                 to_page=task["to_page"], lang=task["language"], callback=progress_callback,
                                 kb_id=task["kb_id"], parser_config=task["parser_config"], tenant_id=task["tenant_id"]))
         logging.info("Chunking({}) {}/{} done".format(timer() - st, task["location"], task["name"]))
