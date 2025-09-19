@@ -104,12 +104,12 @@ OCR로 인식된 텍스트이므로 문맥을 고려하되, 아래 제약을 반
         if corr_len == 0:
             return False
 
-        if orig_len <= 10:
+        if orig_len <= 30:
             # Very short snippets are accepted as long as they are non-empty
             return True
 
         ratio = corr_len / orig_len if orig_len else 1.0
-        if ratio < 0.6 or ratio > 1.4:
+        if ratio < 0.55 or ratio > 1.45:
             return False
 
         orig_lines = [l for l in orig_text.splitlines() if l.strip()]
@@ -125,7 +125,7 @@ OCR로 인식된 텍스트이므로 문맥을 고려하되, 아래 제약을 반
             return False
 
         similarity = SequenceMatcher(None, orig_compact, corr_compact).ratio()
-        if similarity < 0.65:
+        if similarity < 0.6:
             return False
 
         return True
