@@ -88,7 +88,7 @@ export default {
       fileManager: 'File Management',
       flow: 'Agent',
       search: 'Search',
-      welcome: 'Welcome to H-Flow',
+      welcome: 'Welcome to',
       dataset: 'Dataset',
     },
     knowledgeList: {

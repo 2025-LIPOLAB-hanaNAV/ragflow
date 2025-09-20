@@ -4,7 +4,6 @@ import {
 } from '@/constants/chat';
 import { Message } from '@/interfaces/database/chat';
 import { IMessage } from '@/pages/chat/interface';
-import { omit } from 'lodash';
 import { v4 as uuid } from 'uuid';
 
 export const isConversationIdExist = (conversationId: string) => {
@@ -21,7 +20,7 @@ export const buildMessageUuid = (message: Partial<Message | IMessage>) => {
 export const buildMessageListWithUuid = (messages?: Message[]) => {
   return (
     messages?.map((x: Message | IMessage) => ({
-      ...omit(x, 'reference'),
+      ...x,
       id: buildMessageUuid(x),
     })) ?? []
   );

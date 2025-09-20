@@ -195,3 +195,7 @@ dist
 
 # Default backup dir
 backup
+# Local model caches
+models/
+docker/models/BAAI/
+docker/models/hub/
