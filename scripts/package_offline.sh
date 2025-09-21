@@ -108,11 +108,21 @@ fi
 LIGHTEN_VAL=${LIGHTEN:-0}
 NEED_MIRROR_VAL=${NEED_MIRROR:-0}
 
-OUTPUT_DIR_ABS=$(python3 - <<'PY'
-import os, sys
-print(os.path.abspath(sys.argv[1]))
-PY
-"$OUTPUT_DIR")
+if [[ "$OUTPUT_DIR" == /* ]]; then
+  OUTPUT_DIR_ABS="$OUTPUT_DIR"
+else
+  OUTPUT_DIR_ABS="$(pwd)/$OUTPUT_DIR"
+fi
+
+if ! OUTPUT_DIR_ABS=$(python3 -c 'import os, sys; print(os.path.normpath(sys.argv[1]))' "$OUTPUT_DIR_ABS"); then
+  echo "Failed to resolve absolute path for output directory" >&2
+  exit 1
+fi
+
+if [[ -z "$OUTPUT_DIR_ABS" ]]; then
+  echo "Output directory path is empty" >&2
+  exit 1
+fi
 
 WORKTREE_DIR="$OUTPUT_DIR_ABS/bundle"
 IMAGES_DIR="$OUTPUT_DIR_ABS/images"
