@@ -26,7 +26,7 @@ fi
 
 # Build the Docker image
 echo "🏗️ Building Docker image..."
-docker build --build-arg LIGHTEN=0 --build-arg NEED_MIRROR=0 -t jjkim110523/ragflow:latest .
+docker build --build-arg LIGHTEN=0 --build-arg NEED_MIRROR=0 -t jjkim110523/ragflow-local:latest .
 
 # Check build result
 if [ $? -eq 0 ]; then
